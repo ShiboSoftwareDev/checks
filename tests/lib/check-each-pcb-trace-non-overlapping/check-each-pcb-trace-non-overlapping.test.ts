@@ -1,6 +1,11 @@
 import { expect, test, describe } from "bun:test"
 import { checkEachPcbTraceNonOverlapping } from "lib/check-each-pcb-trace-non-overlapping/check-each-pcb-trace-non-overlapping"
-import type { AnySoupElement, PCBTrace, PCBSMTPad } from "circuit-json"
+import type {
+  AnySoupElement,
+  PCBTrace,
+  PCBSMTPad,
+  AnyCircuitElement,
+} from "circuit-json"
 
 describe("checkEachPcbTraceNonOverlapping", () => {
   test("should return no errors when traces don't overlap", () => {
@@ -137,5 +142,71 @@ describe("checkEachPcbTraceNonOverlapping", () => {
     expect(errors).toHaveLength(1)
     expect(errors[0].message).toContain("overlaps with")
     expect(errors[0].pcb_trace_id).toBe("trace1")
+  })
+
+  test("should allow overriding minimum spacing", () => {
+    const circuitJson: AnyCircuitElement[] = [
+      {
+        type: "source_trace",
+        source_trace_id: "trace1",
+        connected_source_port_ids: ["port1", "port2"],
+        connected_source_net_ids: [],
+      },
+      {
+        type: "source_trace",
+        source_trace_id: "trace2",
+        connected_source_port_ids: ["port3", "port4"],
+        connected_source_net_ids: [],
+      },
+      {
+        type: "pcb_trace",
+        pcb_trace_id: "trace1",
+        route: [
+          {
+            route_type: "wire",
+            x: 0,
+            y: 0,
+            width: 0.1,
+            layer: "top",
+            start_pcb_port_id: "port1",
+          },
+          {
+            route_type: "wire",
+            x: 1,
+            y: 0,
+            width: 0.1,
+            layer: "top",
+            end_pcb_port_id: "port2",
+          },
+        ],
+      },
+      {
+        type: "pcb_trace",
+        pcb_trace_id: "trace2",
+        route: [
+          {
+            route_type: "wire",
+            x: 0,
+            y: 0.19,
+            width: 0.1,
+            layer: "top",
+            start_pcb_port_id: "port3",
+          },
+          {
+            route_type: "wire",
+            x: 1,
+            y: 0.19,
+            width: 0.1,
+            layer: "top",
+            end_pcb_port_id: "port4",
+          },
+        ],
+      },
+    ]
+
+    expect(checkEachPcbTraceNonOverlapping(circuitJson)).toHaveLength(1)
+    expect(
+      checkEachPcbTraceNonOverlapping(circuitJson, { minSpacing: 0 }),
+    ).toEqual([])
   })
 })
