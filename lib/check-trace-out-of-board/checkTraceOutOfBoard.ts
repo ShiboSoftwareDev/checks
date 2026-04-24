@@ -1,12 +1,14 @@
+import { cju } from "@tscircuit/circuit-json-util"
+import type { Point, Polygon } from "@tscircuit/math-utils"
+import { segmentToSegmentMinDistance } from "@tscircuit/math-utils"
 import type {
   AnyCircuitElement,
   PcbBoard,
   PcbTrace,
   PcbTraceError,
 } from "circuit-json"
-import { cju } from "@tscircuit/circuit-json-util"
-import type { Point, Polygon } from "@tscircuit/math-utils"
-import { segmentToSegmentMinDistance } from "@tscircuit/math-utils"
+import { getBoardDrcValue, getPcbBoard } from "lib/drc-defaults"
+import { jlcMinTolerances } from "@tscircuit/jlcpcb-manufacturing-specs"
 
 /**
  * Default margin for trace clearance from board edge (in mm)
@@ -61,15 +63,12 @@ export function checkPcbTracesOutOfBoard(
   config: TraceBoardCheckConfig = {},
 ): PcbTraceError[] {
   const errors: PcbTraceError[] = []
-  const margin = config.margin ?? DEFAULT_BOARD_MARGIN
-
-  // Find the board
-  const board = circuitJson.find(
-    (el): el is PcbBoard => el.type === "pcb_board",
-  )
+  const board = getPcbBoard(circuitJson)
   if (!board) return errors
-
-  // Create board polygon using math-utils Point type
+  const margin =
+    config.margin ??
+    getBoardDrcValue(board, "min_board_edge_clearance") ??
+    jlcMinTolerances.min_board_edge_clearance
   const boardPoints = getBoardPolygonPoints(board)
   if (!boardPoints) return errors
 
@@ -93,7 +92,7 @@ export function checkPcbTracesOutOfBoard(
       const segmentEnd: Point = { x: p2.x, y: p2.y }
 
       // Calculate minimum distance from trace segment to board polygon
-      let minDistance = Infinity
+      let minDistance = Number.POSITIVE_INFINITY
       for (let j = 0; j < boardPoints.length; j++) {
         const edgeStart = boardPoints[j]
         const edgeEnd = boardPoints[(j + 1) % boardPoints.length]
@@ -108,7 +107,7 @@ export function checkPcbTracesOutOfBoard(
         }
       }
 
-      const minimumDistance = traceWidth / 2 + margin
+      const minimumDistance = traceWidth / 2 + margin!
 
       if (minDistance < minimumDistance) {
         const error: PcbTraceError = {
